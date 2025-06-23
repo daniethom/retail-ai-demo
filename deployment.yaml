@@ -1,0 +1,88 @@
+# OpenShift Deployment Configuration for Retail AI Assistant
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retail-ai-assistant
+  labels:
+    app: retail-ai-assistant
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: retail-ai-assistant
+  template:
+    metadata:
+      labels:
+        app: retail-ai-assistant
+        version: v1
+    spec:
+      containers:
+      - name: retail-ai-assistant
+        image: retail-ai-assistant:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/models
+      volumes:
+      - name: model-storage
+        emptyDir:
+          sizeLimit: 10Gi
+---
+# Service to expose the deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: retail-ai-assistant-service
+  labels:
+    app: retail-ai-assistant
+spec:
+  selector:
+    app: retail-ai-assistant
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+---
+# Route to make the service accessible externally
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: retail-ai-assistant-route
+  labels:
+    app: retail-ai-assistant
+spec:
+  to:
+    kind: Service
+    name: retail-ai-assistant-service
+  port:
+    targetPort: 8000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
